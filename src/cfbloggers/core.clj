@@ -160,7 +160,7 @@
   [n]
   (->> (take n (parse-opml))
        (mapv (fn [blog] (future (parse-blog blog))))
-       (pmap deref)
+       (mapv deref)
        (group-by first)))
 
 (defn process-blogs
@@ -174,6 +174,7 @@
   code that follows..."
   [n]
   (let [blogs (parse-and-sift n)
+        _     (println-1 "Got all the data, sorting...")
         gone  (->> blogs :gone (sort-by second) (map rest))
         bad   (->> blogs :bad (sort-by second) (map rest))
         here  (->> blogs :ok (sort-by second) reverse (map rest))]
@@ -189,6 +190,7 @@
   (let [n-str (or (first args) "30")
         n     (Long/parseLong n-str)
         [n-gone n-bad n-here gone bad here] (process-blogs n)]
+    (println-1 "Writing files...")
     (let [file  "/Users/sean/Box Sync/corfield.org/articles/cfbloggers.html"
           output (with-out-str
                    (println (str "<p>Of the " (+ n-gone n-bad n-here)
