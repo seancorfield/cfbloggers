@@ -27,7 +27,7 @@
 (defn println-1
   "A single-threaded println. Uses the io agent."
   [& args]
-  (apply send io (fn [_ & args] (apply println args)) args)
+  (apply send io (fn [_ & args] (apply println @counter ")" args)) args)
   ;; must return nil - we're a substitute for println and some code assumes this!
   nil)
 
@@ -52,11 +52,14 @@
   is invalid for whatever reason. Otherwise returns a data structure
   that represents the parsed XML."
   [url]
-  (println-1 (str "fetching: " url " (" @counter ")"))
+  (println-1 (str "fetching: " url))
   (try
-    (let [response (client/get url {:socket-timeout 60000
-                                    :conn-timeout 60000
-                                    :throw-exceptions false})]
+    (let [response (client/get url {:socket-timeout 5000
+                                    :conn-timeout 5000
+                                    :throw-exceptions false
+                                    :retry-handler (fn [ex n _]
+                                                     (and (not (instance? java.net.UnknownHostException ex))
+                                                          (< n 3)))})]
       (if (= 200 (:status response))
         (try
           (xml/parse (string-as-input-stream (:body response)))
@@ -99,7 +102,7 @@
         [:bad (str slug " - " feed) url]
         (let [stream (drop-while (fn [e] (and (not= :item (:tag e))
                                               (not= :entry (:tag e))))
-                                 (xml-seq feed))
+                                 (take 500 (xml-seq feed)))
               post (-> (for [e stream :when (= :title (:tag e))]
                          (:content e))
                        maybe-first maybe-first)
@@ -125,7 +128,9 @@
                            (println-1 (str "bad date? " url " " raw-date))
                            (dt/date-time 1962 7 7))))]
           (if (seq stream)
-            [:ok date (str slug " - " date ": " post) url]
+            (do
+              (println-1 (str "done! " url))
+              [:ok date (str slug " - " date ": " post) url])
             (do
               (println-1 (str "not an rss feed? " url))
               [:bad (str slug " - not an rss feed?") url]))))
@@ -153,9 +158,9 @@
   forcing a dereference of all the futures, then group them according
   to success or failure (:ok, :bad, or :gone)."
   [n]
-  (->> (vec (take n (parse-opml)))
+  (->> (take n (parse-opml))
        (mapv (fn [blog] (future (parse-blog blog))))
-       (mapv deref)
+       (pmap deref)
        (group-by first)))
 
 (defn process-blogs
