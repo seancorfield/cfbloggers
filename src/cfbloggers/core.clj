@@ -54,12 +54,12 @@
   [url]
   (println-1 (str "fetching: " url))
   (try
-    (let [response (client/get url {:socket-timeout 5000
-                                    :conn-timeout 5000
+    (let [response (client/get url {:socket-timeout 9000
+                                    :conn-timeout 9000
                                     :throw-exceptions false
                                     :retry-handler (fn [ex n _]
                                                      (and (not (instance? java.net.UnknownHostException ex))
-                                                          (< n 3)))})]
+                                                          (< n 9)))})]
       (if (= 200 (:status response))
         (try
           (xml/parse (string-as-input-stream (:body response)))
